@@ -92,6 +92,8 @@
       tg.expand();
     }
 
+    const html5QrCode = new Html5Qrcode("reader");
+
     function onScanSuccess(decodedText, decodedResult) {
       // Haptic feedback trigger on mobile
       if (tg && tg.HapticFeedback) {
@@ -104,21 +106,36 @@
       resultText.innerText = decodedText;
       resultCard.classList.add('active');
 
-      // Send scanned data back to Telegram bot and close web app
-      setTimeout(() => {
+      // Stop scanner before sending data to prevent double-firing
+      html5QrCode.stop().then(() => {
+        setTimeout(() => {
+          if (tg) {
+            tg.sendData(decodedText);
+            tg.close();
+          }
+        }, 400);
+      }).catch(() => {
         if (tg) {
           tg.sendData(decodedText);
           tg.close();
         }
-      }, 500); // Small 0.5s delay so you can see the success card flash before it closes
+      });
     }
 
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", 
-      { fps: 10, qrbox: { width: 220, height: 220 } },
-      /* verbose= */ false
-    );
-    html5QrcodeScanner.render(onScanSuccess);
+    // Automatically start the main rear camera without showing a dropdown of lenses
+    const qrConfig = { fps: 10, qrbox: { width: 220, height: 220 } };
+    
+    html5QrCode.start(
+      { facingMode: "environment" }, 
+      qrConfig, 
+      onScanSuccess,
+      (errorMessage) => {
+        // Ignore frame-by-frame scan misses to keep console clean
+      }
+    ).catch((err) => {
+      console.error("Camera start error:", err);
+      alert("Could not access camera. Please ensure camera permissions are allowed in your browser/Telegram settings.");
+    });
   </script>
 </body>
 </html>
